@@ -1,16 +1,27 @@
 const { GraphQLServer } = require('graphql-yoga');
-
-const todoLists = [];
+const Todo = require('./src/models/todo')
 
 const typeDefs = `
-  type TodoList {
+
+  type TodoItem {
     id: ID!
     todo: String!
     status: String
   }
 
+  type TodoLists {
+    items: [TodoItem!]
+    count: Int!
+  }
+
+  input TodoArgs {
+    offset: Int
+    first: Int
+    search: String
+  }
+
   type Query {
-    todos: [TodoList!]
+    todos(args:TodoArgs):TodoLists!
   }
 
 
@@ -18,50 +29,72 @@ const typeDefs = `
     postTodo(todo:String!, status: String):ID!
     updateTodo(id:ID!, todo: String!):ID!
     updateStatus(id:ID!, status: String!):ID!
-    removeTodo(id:ID!):ID!
+    removeTodo(id:ID!):Boolean!
   }
 `;
 
 const resolvers = {
   Query: {
-    todos: () => todoLists
+    todos: async (_, arg) => {
+      const { offset = 0, first = 10, search = '' } = arg;
+      let todoOpt = {};
+      if (search !== '') {
+        todoOpt = { todo: new RegExp('^' + search + '$', "i") }
+      }
+      const items = await Todo.find(todoOpt).skip(offset).limit(first).exec()
+      const count = await Todo.count(todoOpt)
+      return {
+        items,
+        count
+      }
+    }
   },
   Mutation: {
-    postTodo: (_, { todo, status = 'pending' }) => {
-      const id = todoLists.length + 1
-      todoLists.push({
-        id,
-        todo,
-        status
+    postTodo: async (_, { todo, status = 'pending' }) => {
+      return new Promise((resolve, reject) => {
+        const todoInsert = new Todo({ todo, status });
+
+        todoInsert.save().then(data => {
+          resolve(data._id);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(err);
+        })
       })
-      return id
     },
     updateTodo: (_, { id, todo }) => {
-      let tmp = todoLists.find(item => {
-        return item.id.toString() === id.toString()
-      });
-
-      if (tmp) {
-        tmp.todo = todo
-      }
-      console.log(tmp)
-      return id
+      return new Promise((resolve, reject) => {
+        Todo.findByIdAndUpdate(id, { todo }).then(data => {
+          resolve(data._id);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(err);
+        })
+      })
     },
     updateStatus: (_, { id, status }) => {
-      let tmp = todoLists.find(item => {
-        return item.id.toString() === id.toString()
-      });
-
-      if (tmp) {
-        tmp.status = status
-      }
-      return id
+      return new Promise((resolve, reject) => {
+        Todo.findByIdAndUpdate(id, { status }).then(data => {
+          resolve(data._id);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(err);
+        })
+      })
     },
     removeTodo: (_, { id }) => {
-      todoLists = [...todoLists].filter(item => {
-        return item.id.toString() != id.toString()
+      return new Promise((resolve, reject) => {
+        Todo.findByIdAndRemove(id).then(data => {
+          let res = false;
+          if (data._id) {
+            res = true;
+          }
+          resolve(res);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(false);
+        })
       })
-      return id
     }
   }
 }
