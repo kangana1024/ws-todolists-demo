@@ -1,13 +1,13 @@
-# Websocket Graphql Demo
+# Websocket Graphql Demo (SERVER)
 
 ## install
 
-```bash
+``` bash
 npm install
 ```
 
 or
 
-```bash
+``` bash
 yarn
 ```
