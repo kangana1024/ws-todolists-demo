@@ -1,5 +1,5 @@
-const { GraphQLServer } = require('graphql-yoga');
-const Todo = require('./src/models/todo')
+import { GraphQLServer } from 'graphql-yoga';
+import Todo from './src/models/todo';
 
 const typeDefs = `
 
