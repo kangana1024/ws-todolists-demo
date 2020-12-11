@@ -1,6 +1,6 @@
 # Websocket Graphql Demo (SERVER)
 
-## install
+## Install
 
 ``` bash
 npm install
@@ -10,4 +10,10 @@ or
 
 ``` bash
 yarn
+```
+
+## Set Env
+
+``` bash
+cp env-simple .env
 ```
