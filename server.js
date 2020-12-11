@@ -18,6 +18,7 @@ const typeDefs = `
     postTodo(todo:String!, status: String):ID!
     updateTodo(id:ID!, todo: String!):ID!
     updateStatus(id:ID!, status: String!):ID!
+    removeTodo(id:ID!):ID!
   }
 `;
 
@@ -54,6 +55,12 @@ const resolvers = {
       if (tmp) {
         tmp.status = status
       }
+      return id
+    },
+    removeTodo: (_, { id }) => {
+      todoLists = [...todoLists].filter(item => {
+        return item.id.toString() != id.toString()
+      })
       return id
     }
   }
