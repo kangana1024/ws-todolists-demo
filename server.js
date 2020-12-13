@@ -129,7 +129,7 @@ const pubsub = new PubSub();
 
 const server = new GraphQLServer({ typeDefs, resolvers, context: { pubsub } });
 const opts = {
-  port: 4000,
+  port: process.env.PORT,
   cors: {
     credentials: true,
     origin: [process.env.LINK_CORS]
