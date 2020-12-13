@@ -1,16 +1,40 @@
-const { GraphQLServer } = require('graphql-yoga');
-
-const todoLists = [];
-
+import { GraphQLServer, PubSub } from 'graphql-yoga';
+import Todo from './src/models/todo';
+const channel = "todolists";
+const getTodo = async (arg) => {
+  const { offset, first, search = '' } = arg;
+  let todoOpt = {};
+  if (search !== '') {
+    todoOpt = { todo: new RegExp('^' + search + '$', "i") }
+  }
+  const items = await Todo.find(todoOpt).skip(offset).sort([['date_added', -1]]).limit(first).exec()
+  const count = await Todo.count(todoOpt)
+  return {
+    items,
+    count
+  }
+}
 const typeDefs = `
-  type TodoList {
+
+  type TodoItem {
     id: ID!
     todo: String!
     status: String
   }
 
+  type TodoLists {
+    items: [TodoItem!]
+    count: Int!
+  }
+
+  input TodoArgs {
+    offset: Int
+    first: Int
+    search: String
+  }
+
   type Query {
-    todos: [TodoList!]
+    todos(args:TodoArgs):TodoLists!
   }
 
 
@@ -18,53 +42,97 @@ const typeDefs = `
     postTodo(todo:String!, status: String):ID!
     updateTodo(id:ID!, todo: String!):ID!
     updateStatus(id:ID!, status: String!):ID!
+    removeTodo(id:ID!):Boolean!
+  }
+
+  type Subscription {
+    todos(args:TodoArgs):TodoLists
   }
 `;
-
+const subscribers = [];
+const onTodoUpdates = (fn) => subscribers.push(fn);
 const resolvers = {
   Query: {
-    todos: () => todoLists
+    todos: async (_, arg) => {
+      return await getTodo(arg)
+    }
+  },
+  Subscription: {
+    todos: {
+      subscribe: async (_, arg, { pubsub }) => {
+        const todoRes = await getTodo(arg);
+        onTodoUpdates(() => pubsub.publish(channel, { todos: todoRes }));
+        setTimeout(() => pubsub.publish(channel, { todos: todoRes }), 0);
+        return pubsub.asyncIterator(channel);
+      }
+    }
   },
   Mutation: {
-    postTodo: (_, { todo, status = 'pending' }) => {
-      const id = todoLists.length + 1
-      todoLists.push({
-        id,
-        todo,
-        status
+    postTodo: async (_, { todo, status = 'pending' }) => {
+      return new Promise((resolve, reject) => {
+        const todoInsert = new Todo({ todo, status, date_added: new Date() });
+
+        todoInsert.save().then(async (data) => {
+          const todoRes = await getTodo({ offset: 0, first: 100, search: '' });
+          pubsub.publish(channel, { todos: todoRes })
+          resolve(data._id);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(err);
+        })
       })
-      return id
     },
     updateTodo: (_, { id, todo }) => {
-      let tmp = todoLists.find(item => {
-        return item.id.toString() === id.toString()
-      });
-
-      if (tmp) {
-        tmp.todo = todo
-      }
-      console.log(tmp)
-      return id
+      return new Promise((resolve, reject) => {
+        Todo.findByIdAndUpdate(id, { todo }).then(async (data) => {
+          const todoRes = await getTodo({ offset: 0, first: 100, search: '' });
+          pubsub.publish(channel, { todos: todoRes })
+          resolve(data._id);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(err);
+        })
+      })
     },
     updateStatus: (_, { id, status }) => {
-      let tmp = todoLists.find(item => {
-        return item.id.toString() === id.toString()
-      });
-
-      if (tmp) {
-        tmp.status = status
-      }
-      return id
+      return new Promise((resolve, reject) => {
+        Todo.findByIdAndUpdate(id, { status }).then(async (data) => {
+          const todoRes = await getTodo({ offset: 0, first: 100, search: '' });
+          pubsub.publish(channel, { todos: todoRes })
+          resolve(data._id);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(err);
+        })
+      })
+    },
+    removeTodo: (_, { id }) => {
+      return new Promise((resolve, reject) => {
+        Todo.findByIdAndRemove(id).then(async (data) => {
+          let res = false;
+          if (data._id) {
+            res = true;
+          }
+          const todoRes = await getTodo({ offset: 0, first: 100, search: '' });
+          pubsub.publish(channel, { todos: todoRes })
+          resolve(res);
+        }).catch(err => {
+          console.log('error : ', err);
+          reject(false);
+        })
+      })
     }
   }
 }
 
-const server = new GraphQLServer({ typeDefs, resolvers });
+const pubsub = new PubSub();
+
+const server = new GraphQLServer({ typeDefs, resolvers, context: { pubsub } });
 const opts = {
   port: 4000,
   cors: {
     credentials: true,
-    origin: ["http://localhost:8080"]
+    origin: [process.env.LINK_CORS]
   }
 };
 
