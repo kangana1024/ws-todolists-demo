@@ -132,7 +132,7 @@ const opts = {
   port: 4000,
   cors: {
     credentials: true,
-    origin: ["http://localhost:8080"]
+    origin: [process.env.LINK_CORS]
   }
 };
 
