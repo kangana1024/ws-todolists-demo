@@ -1,73 +1,57 @@
 const { GraphQLServer } = require('graphql-yoga');
-
-const todoLists = [];
+const todoLists = [
+  {
+    id: 1,
+    todo: "todo 01",
+    status: "PENDING"
+  },
+  {
+    id: 2,
+    todo: "todo 02",
+    status: "PENDING"
+  },
+];
 
 const typeDefs = `
   type TodoList {
     id: ID!
     todo: String!
-    status: String
+    status: String!
   }
 
   type Query {
-    todos: [TodoList!]
+    todos: [TodoList]
   }
-
 
   type Mutation {
-    postTodo(todo:String!, status: String):ID!
-    updateTodo(id:ID!, todo: String!):ID!
-    updateStatus(id:ID!, status: String!):ID!
+    addTodo(todo:String!,status:String):ID!
   }
 `;
-
 const resolvers = {
   Query: {
-    todos: () => todoLists
+    todos: function () {
+      return todoLists
+    }
   },
   Mutation: {
-    postTodo: (_, { todo, status = 'pending' }) => {
-      const id = todoLists.length + 1
+    addTodo: function (_, { todo, status = 'PENDING' }) {
+      const id = todoLists.length + 1; // create ID
+
       todoLists.push({
         id,
         todo,
         status
-      })
-      return id
-    },
-    updateTodo: (_, { id, todo }) => {
-      let tmp = todoLists.find(item => {
-        return item.id.toString() === id.toString()
-      });
+      }); // Push new todo
 
-      if (tmp) {
-        tmp.todo = todo
-      }
-      console.log(tmp)
-      return id
-    },
-    updateStatus: (_, { id, status }) => {
-      let tmp = todoLists.find(item => {
-        return item.id.toString() === id.toString()
-      });
-
-      if (tmp) {
-        tmp.status = status
-      }
       return id
     }
   }
-}
-
-const server = new GraphQLServer({ typeDefs, resolvers });
-const opts = {
-  port: 4000,
-  cors: {
-    credentials: true,
-    origin: ["http://localhost:8080"]
-  }
 };
 
-server.start(opts, ({ port }) => {
-  console.log(`Server on http://localhost:${port}/`);
+const server = new GraphQLServer({ typeDefs, resolvers });
+const options = {
+  port: 5000
+}
+server.start(options, function ({ port }) {
+  console.log(`server start on port : ${port}`)
 })
